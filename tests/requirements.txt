@@ -1,0 +1,2 @@
+# Plotting only; benchmark execution itself uses C and POSIX shell.
+matplotlib>=3.6
