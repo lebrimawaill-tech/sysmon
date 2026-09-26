@@ -99,7 +99,7 @@ class LiveTest:
         deadline = time.monotonic() + 5
         while not Path('/dev/sysmon').exists() and time.monotonic() < deadline:
             time.sleep(.01)
-        require("Current mode: off;" in self.ctl('--status'), "Module must initially be off")
+        require("Current mode: off\n" in self.ctl('--status'), "Module must initially be off")
         self.prepared = True
         self.channel, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
         self.channel.settimeout(3)
@@ -152,7 +152,7 @@ class LiveTest:
         require(self.collector.returncode == 0, f"FSM failed: {read_text(self.console_path)}")
         count = validate_fsm(read_text(self.output / 'sysmon.log'), states)
         require('FSM completed one cycle' in read_text(self.console_path), "Missing completion message")
-        require('Current mode: off;' in self.ctl('--status'), "FSM left monitoring enabled")
+        require('Current mode: off\n' in self.ctl('--status'), "FSM left monitoring enabled")
         self.stop()
         print(f'FSM: {count}/{len(states)} states observed, including state {len(states)}; returned to state 1.\n',
               flush=True)

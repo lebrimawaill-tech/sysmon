@@ -21,7 +21,6 @@ struct sysmon_config {
 	int mode;
 	int pid;
 	int syscall;
-	unsigned long long drops;
 	unsigned long long watch;
 };
 
@@ -88,7 +87,7 @@ void sysmon_usage(FILE *stream, const char *program);
 int sysmon_parse_commands(int argc, char **argv, struct sysmon_options *options);
 
 /*
- * Read the current mode, drop count, and mode-specific block rule or FSM
+ * Read the current mode and mode-specific block rule or FSM
  * watch.
  */
 int sysmon_get_config(int fd, struct sysmon_config *config);
@@ -99,7 +98,7 @@ int sysmon_get_config(int fd, struct sysmon_config *config);
  */
 int sysmon_apply_commands(int fd, const struct sysmon_options *options);
 
-/* Print the active configuration and warn when records have been dropped. */
+/* Print the active mode and its applicable block rule or FSM watch. */
 void sysmon_print_config(const struct sysmon_config *config);
 
 /*

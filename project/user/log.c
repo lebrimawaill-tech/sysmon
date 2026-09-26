@@ -173,14 +173,14 @@ static int append_record(FILE *file, const struct sysmon_record *record,
 		    "mono_ns=%llu seq=%llu pid=%d tid=%d comm=\"%s\" "
 		    "syscall=\"%s\" operation=%s blocked=%s "
 		    "args=[0x%lx,0x%lx,0x%lx,0x%lx,0x%lx,0x%lx] "
-		    "%s path=\"%s\" source=%s watch=%llu dropped=%llu%s\n\n",
+		    "%s path=\"%s\" source=%s watch=%llu%s\n\n",
 		    color, captured, appended, record->wall_ns, append_ns, record->mono_ns,
 		    record->seq, record->pid, record->tid, comm, name,
 		    sysmon_op_name(record->op), record->blocked ? "yes" : "no",
 		    record->args[0], record->args[1], record->args[2],
 		    record->args[3], record->args[4], record->args[5], details, path,
 		    record->watch ? "fsm_match" : "log_ring", record->watch,
-		    record->dropped, reset) < 0 || fflush(file)) {
+		    reset) < 0 || fflush(file)) {
 		fprintf(stderr, "Cannot append to sysmon.log: %s\n", strerror(errno));
 		return -1;
 	}
@@ -215,16 +215,19 @@ int sysmon_collect(int fd, FILE *log_file,
 	struct sigaction old_int, old_term;
 	struct pollfd descriptor = { .fd = fd, .events = fsm ? POLLPRI : POLLIN };
 	struct sysmon_stats stats;
-	unsigned long long records = 0, initial_drops;
+	unsigned long long records = 0, initial_drops = 0;
 	size_t pending = 0;
 	int result = -1;
 
-	/* Lifetime totals preserve collection losses across another CLI's OFF. */
-	if (ioctl(fd, SYSMON_GET_STATS, &stats) < 0) {
-		fprintf(stderr, "Cannot get initial drop count: %s\n", strerror(errno));
-		return -1;
+	/* Measure only this collection interval when metrics are requested.
+	 * Lifetime totals preserve losses across another CLI's OFF/reset. */
+	if (metrics) {
+		if (ioctl(fd, SYSMON_GET_STATS, &stats) < 0) {
+			fprintf(stderr, "Cannot get initial drop count: %s\n", strerror(errno));
+			return -1;
+		}
+		initial_drops = stats.drops;
 	}
-	initial_drops = stats.drops;
 	stop_collecting = 0;
 	sigemptyset(&action.sa_mask);
 	if (sigaction(SIGINT, &action, &old_int) < 0) {
@@ -326,7 +329,9 @@ completed:
 out:
 	if (pending)
 		fprintf(stderr, "Discarding %zu bytes of an incomplete record.\n", pending);
-	if (ioctl(fd, SYSMON_GET_STATS, &stats) < 0) {
+	if (!metrics) {
+		printf("Collection stopped: %llu records appended.\n", records);
+	} else if (ioctl(fd, SYSMON_GET_STATS, &stats) < 0) {
 		fprintf(stderr, "Cannot get final drop count: %s\n", strerror(errno));
 		result = -1;
 	} else {

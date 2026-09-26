@@ -99,6 +99,21 @@ For all command-line options:
 ./user/sysmonctl --help
 ```
 
+To measure latency and queue drops during collection, use a new CSV path:
+
+```sh
+sudo ./user/sysmonctl --log --metrics metrics.csv
+```
+
+At shutdown, the collector reports the increase in the kernel's lifetime drop
+counter between the start and end of this collection session. Earlier losses
+and losses after collection ends are excluded; an `--off` command during the
+session does not erase measured losses. This is a system-wide ring-loss count,
+not a count restricted to one benchmark process. Event timestamps are saved
+in the CSV; the drop total appears in the console summary. `--off`, `--status`,
+and collection without `--metrics` do not report drops. Individual log entries
+also omit the historical drop count.
+
 ## Run an FSM
 
 An FSM watches operations in the order listed in its JSON `states` array.

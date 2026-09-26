@@ -46,11 +46,12 @@ void sysmon_usage(FILE *stream, const char *program)
 		"  --file [PATH]      With --log, run the FSM from PATH (default fsm.json).\n"
 		"                     JSON: {\"states\": [\"open\", \"read\", \"write\"]}\n"
 		"  --once             With --log --file, stop in off mode after one cycle.\n"
-		"  --off              Show pre-reset drops, disable monitoring and reset the count.\n"
+		"  --off              Disable monitoring.\n"
 		"  --collect          Collect events without changing the current mode.\n"
 		"  --status           Print configuration; suppress automatic collection.\n"
 		"  --metrics PATH     Save optional performance timestamps to a new CSV file.\n"
 		"                     Requires collection; holds up to 262144 rows in memory.\n"
+		"                     Report queue drops during this measurement session only.\n"
 		"  --help             Show this help.\n"
 		"\n"
 		"Events append to ./sysmon.log with capture and append timestamps.\n"
@@ -227,7 +228,7 @@ static int get_value(int fd, unsigned long command, void *value, const char *nam
 }
 
 /*
- * Read the current mode, drop count, and mode-specific block rule or FSM
+ * Read the current mode and mode-specific block rule or FSM
  * watch.
  */
 int sysmon_get_config(int fd, struct sysmon_config *config)
@@ -243,7 +244,7 @@ int sysmon_get_config(int fd, struct sysmon_config *config)
 	    (get_value(fd, SYSMON_GET_PID, &config->pid, "PID") ||
 	     get_value(fd, SYSMON_GET_SYSCALL, &config->syscall, "syscall")))
 		return -1;
-	return get_value(fd, SYSMON_GET_DROPS, &config->drops, "drop count");
+	return 0;
 }
 
 /* Send a scalar ioctl setting and report failures using the setting name. */
@@ -263,20 +264,10 @@ static int set_value(int fd, unsigned long command, int value, const char *name)
  */
 int sysmon_apply_commands(int fd, const struct sysmon_options *options)
 {
-	unsigned long long drops_before_off = 0;
-
-	/* Snapshot before OFF resets the kernel counter. Print after disabling
-	 * so this console write cannot generate another monitored event.
-	 */
-	if (options->mode == SYSMON_OFF &&
-	    get_value(fd, SYSMON_GET_DROPS, &drops_before_off, "pre-reset drop count"))
-		return -1;
 	/* Leave blocking before updating its unused settings for off/log mode. */
 	if ((options->mode == SYSMON_OFF || options->mode == SYSMON_LOG) &&
 	    set_value(fd, SYSMON_SET_MODE, options->mode, "mode"))
 		return -1;
-	if (options->mode == SYSMON_OFF)
-		printf("Dropped before reset (snapshot): %llu\n\n", drops_before_off);
 	if (options->pid != -1 && set_value(fd, SYSMON_SET_PID, options->pid, "PID"))
 		return -1;
 	if (options->syscall != -1 &&
@@ -288,11 +279,10 @@ int sysmon_apply_commands(int fd, const struct sysmon_options *options)
 	return 0;
 }
 
-/* Print the active configuration and warn when records have been dropped. */
+/* Print the active mode and its applicable block rule or FSM watch. */
 void sysmon_print_config(const struct sysmon_config *config)
 {
-	printf("Current mode: %s; dropped: %llu\n",
-	       sysmon_mode_name(config->mode), config->drops);
+	printf("Current mode: %s\n", sysmon_mode_name(config->mode));
 	if (config->mode == SYSMON_BLOCK)
 		printf("Blocking syscall: %s; target PID: %d\n",
 		       sysmon_op_name(config->syscall), config->pid);
@@ -301,7 +291,4 @@ void sysmon_print_config(const struct sysmon_config *config)
 		       sysmon_op_name(SYSMON_WATCH_OP(config->watch)), config->watch);
 	else if (config->mode == SYSMON_LOG)
 		printf("Observing open/read/write for all processes except the collector.\n");
-	if (config->drops)
-		fprintf(stderr, "Warning: %llu events have been lost from the kernel queue since the last --off (or module load).\n",
-			config->drops);
 }
