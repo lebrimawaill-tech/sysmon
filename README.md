@@ -26,7 +26,7 @@ On Ubuntu, install the build and test dependencies:
 
 ```sh
 sudo apt update
-sudo apt install build-essential linux-headers-$(uname -r) kmod util-linux python3 python3-matplotlib
+sudo apt install git build-essential linux-headers-$(uname -r) kmod util-linux python3 python3-matplotlib
 ```
 
 Python and Matplotlib are used by the analysis and unprivileged test suite.
@@ -40,12 +40,17 @@ from loading.
 
 ## Compile
 
-Clone this repository and open its root directory. All commands below assume
-that working directory unless stated otherwise.
+Clone the repository into a folder named `project`, enter that folder, and
+compile:
 
 ```sh
+git clone https://github.com/lebrimawaill-tech/sysmon.git project
+cd project
 make kmod user tests
 ```
+
+Run all commands below from this `project` directory unless stated otherwise.
+If you open another terminal, first change to the same directory.
 
 This produces `kmod/sysmon.ko`, `user/sysmonctl`, and the test executables.
 Compilation does not require `sudo`. To build only the userspace programs:
@@ -69,8 +74,10 @@ Start ordinary logging:
 sudo ./user/sysmonctl --log
 ```
 
-The collector prints observations and appends to `sysmon.log` in its current
-working directory. Logging observes system-wide operations; `--pid` configures
+The collector prints observations and automatically creates `sysmon.log` in
+the current directory if it is missing. With the `cd project` setup above,
+the file is `project/sysmon.log`; existing contents are preserved and new
+entries are appended. Logging observes system-wide operations; `--pid` configures
 blocking and does not filter ordinary logging. Only one collector can own
 event delivery at a time.
 
